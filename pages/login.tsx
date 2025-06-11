@@ -2,13 +2,40 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 
+declare global {
+  interface Window {
+    FB: any;
+  }
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [username, setUsername] = useState("");
 
+  const initFacebook = () => {
+    if (window.FB) {
+      window.FB.init({
+        appId: process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || "",
+        cookie: true,
+        xfbml: true,
+        version: "v17.0",
+      });
+    }
+  };
+
   useEffect(() => {
     const stored = localStorage.getItem("username");
     if (stored) router.push("/dashboard");
+
+    if (!(window as any).FB) {
+      const script = document.createElement("script");
+      script.src = "https://connect.facebook.net/en_US/sdk.js";
+      script.async = true;
+      script.onload = initFacebook;
+      document.body.appendChild(script);
+    } else {
+      initFacebook();
+    }
   }, [router]);
 
   const handleLogin = () => {
@@ -18,6 +45,27 @@ export default function LoginPage() {
     } else {
       alert("Please enter your name to continue");
     }
+  };
+
+  const handleFacebookLogin = () => {
+    if (!window.FB) return;
+    window.FB.login(
+      (response: any) => {
+        if (response.authResponse) {
+          window.FB.api(
+            "/me",
+            { fields: "name" },
+            (info: any) => {
+              if (info && info.name) {
+                localStorage.setItem("username", info.name);
+                router.push("/dashboard");
+              }
+            }
+          );
+        }
+      },
+      { scope: "public_profile,email" }
+    );
   };
 
   return (
@@ -36,6 +84,12 @@ export default function LoginPage() {
           className="w-full bg-blue-600 text-white p-2 rounded"
         >
           Continue to Dashboard
+        </button>
+        <button
+          onClick={handleFacebookLogin}
+          className="w-full bg-blue-800 text-white p-2 rounded mt-4"
+        >
+          Login with Facebook
         </button>
       </div>
     </div>
